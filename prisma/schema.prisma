@@ -1,0 +1,129 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  EMPLOYEE
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TxnStatus {
+  PENDING
+  CLEARED
+  PARTIAL
+  CANCELLED
+}
+
+model User {
+  id           String       @id @default(cuid())
+  name         String
+  email        String       @unique
+  passwordHash String
+  role         Role         @default(EMPLOYEE)
+  phone        String?
+  status       UserStatus   @default(ACTIVE)
+  createdAt    DateTime     @default(now())
+
+  profilesCreated Profile[]      @relation("ProfileCreatedBy")
+  txnsCreated     Transaction[]  @relation("TxnCreatedBy")
+  banksCreated    BankAccount[]  @relation("BankCreatedBy")
+  auditLogs       AuditLog[]
+
+  @@index([email])
+  @@index([role, status])
+}
+
+model Profile {
+  id           String   @id @default(cuid())
+  userId       String   // creator/owner employee
+  fullName     String
+  mobile       String
+  pan          String
+  cardDetails  Json     // [{cardName, cardType, cardNumber(masked), expiry}]
+  bankDetails  Json     // {bankName, accountNumber, ifsc}
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  createdBy    User          @relation("ProfileCreatedBy", fields: [userId], references: [id])
+  transactions Transaction[]
+
+  @@index([userId, isActive])
+  @@index([fullName])
+  @@index([mobile])
+}
+
+model BankAccount {
+  id            String   @id @default(cuid())
+  name          String
+  accountNumber String
+  ifsc          String
+  isPrimary     Boolean  @default(false)
+  createdById   String
+  createdAt     DateTime @default(now())
+
+  createdBy     User         @relation("BankCreatedBy", fields: [createdById], references: [id])
+  transactions  Transaction[]
+
+  @@index([isPrimary])
+}
+
+model Transaction {
+  id                 String     @id @default(cuid())
+  profileId          String
+  date               DateTime   @default(now())
+  dueAmount          Float
+  paidAmount         Float
+  swipeAmount        Float
+  splitPayments      Json       // [{site, amount, ref}]
+  swipePercentage    Float
+  charges            Float
+  pendingAmount      Float
+  clearedAmount      Float
+  extraSwipedAmount  Float
+  balanceToCustomer  Float
+  cardName           String
+  cardType           String
+  cardNumber         String     // masked e.g., ****1234
+  paymentSite        String
+  swipeSite          String
+  swipeDate          DateTime
+  remarks            String?
+  status             TxnStatus  @default(PENDING)
+  bankAccountId      String?
+  createdById        String
+  createdAt          DateTime   @default(now())
+
+  profile     Profile      @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  bankAccount BankAccount? @relation(fields: [bankAccountId], references: [id])
+  createdBy   User         @relation("TxnCreatedBy", fields: [createdById], references: [id])
+
+  @@index([profileId, status])
+  @@index([date])
+  @@index([cardNumber])
+  @@index([createdById])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  action      String
+  entityId    String
+  entityType  String
+  performedBy String
+  meta        Json?
+  timestamp   DateTime @default(now())
+
+  user User @relation(fields: [performedBy], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([performedBy, timestamp])
+}
