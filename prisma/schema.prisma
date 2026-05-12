@@ -1,0 +1,459 @@
+// CC Rotation Ledger — Prisma schema
+// PostgreSQL 16+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  EMPLOYEE
+  CUSTOMER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum CardNetwork {
+  VISA
+  RUPAY
+  MASTERCARD
+  HDFC_RUPAY
+  HDFC_MASTER
+  DINERS_CLUB
+  AMERICAN_EXPRESS
+  OTHER
+}
+
+enum CardType {
+  DOMESTIC
+  BUSINESS
+  INTERNATIONAL
+}
+
+enum KYCStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum CardStatus {
+  ACTIVE
+  BLOCKED
+  EXPIRED
+}
+
+enum TransactionType {
+  BILL_PAYMENT
+  CARD_SWIPE
+  DAILY_REPORT
+}
+
+enum TransactionStatus {
+  PENDING
+  CLEARED
+  OVERDUE
+  CANCELLED
+}
+
+// ADDED v1.3 — ARD Swipe source: SAME (customer's saved card) or OTHER (one-time)
+enum SwipeSource {
+  SAME
+  OTHER
+}
+
+enum ConductType {
+  GOOD
+  PENDING
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  SUBMIT
+  EXPORT
+}
+
+// ─── USERS ────────────────────────────────────────────────────────────────────
+
+model User {
+  id           String     @id @default(cuid())
+  mobile       String     @unique
+  passwordHash String
+  name         String
+  email        String?    @unique
+  role         Role       @default(EMPLOYEE)
+  status       UserStatus @default(ACTIVE)
+  avatarUrl    String?
+  lastLoginAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdProfiles     Profile[]       @relation("ProfileCreator")
+  createdTransactions Transaction[]   @relation("TransactionCreator")
+  deletedTransactions Transaction[]   @relation("DeletedTransactions") // ADDED v1.4
+  auditLogs           AuditLog[]
+  createdFraud        FraudCustomer[] @relation("FraudCreator")
+  conductFlags        ConductRecord[] @relation("ConductFlagged")
+
+  @@index([mobile])
+  @@index([role, status])
+}
+
+// ─── ADDED v1.4 — Race-safe daily transaction-ID counter ─────────────────────
+// Used by lib/transactionId.ts to generate CC-YYYYMMDD-NNNN under concurrent inserts.
+// SELECT FOR UPDATE on this row inside a Prisma transaction guarantees no duplicates.
+model DailyCounter {
+  date     String @id  // YYYYMMDD format, e.g. "20260509"
+  lastSeq  Int    @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+// ─── PROFILES ─────────────────────────────────────────────────────────────────
+
+model Profile {
+  id                 String   @id @default(cuid())
+  profileCreatedDate DateTime @default(now())
+  name               String
+  mobile             String
+  alternativeNumber  String?
+  email              String?
+  selfiePhotoUrl     String?
+  dateOfBirth        DateTime?
+  occupation         String?
+  isActive           Boolean  @default(true)
+  internalNotes      String?  @db.Text
+
+  // ADDED v1.2 — Old pending tracking (admin editable)
+  oldPendings        Decimal @default(0) @db.Decimal(12, 2)
+  clearedOldPendings Decimal @default(0) @db.Decimal(12, 2)
+
+  // ─── Identity documents (informal capture, not regulated KYC) ──────
+  aadhaarNumber   String?
+  panNumber       String?
+  aadhaarFrontUrl String?
+  aadhaarBackUrl  String?
+  panCardUrl      String?
+
+  // ─── Permanent address ─────────────────────────────────────────────
+  permanentAddressLine1 String?
+  permanentAddressLine2 String?
+  permanentLandmark     String?
+  permanentCity         String?
+  permanentState        String?
+  permanentPincode      String?
+
+  // ─── Current address (with same-as toggle) ─────────────────────────
+  currentSameAsPermanent Boolean @default(true)
+  currentAddressLine1    String?
+  currentAddressLine2    String?
+  currentLandmark        String?
+  currentCity            String?
+  currentState           String?
+  currentPincode         String?
+
+  // ─── Local proof documents (any one is fine) ───────────────────────
+  gasBillUrl         String?
+  electricityBillUrl String?
+  rentAgreementUrl   String?
+  bankPassbookUrl    String?
+
+  createdById String
+  createdBy   User   @relation("ProfileCreator", fields: [createdById], references: [id])
+
+  cards          Card[]
+  transactions   Transaction[]
+  conductRecords ConductRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([mobile])
+  @@index([createdById])
+  @@index([createdAt])
+  @@index([aadhaarNumber])
+  @@index([panNumber])
+}
+
+// ─── CARDS ────────────────────────────────────────────────────────────────────
+
+model Card {
+  id        String  @id @default(cuid())
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  holderName      String
+  holderMobile    String
+  holderAltMobile String?
+
+  aadharFrontUrl String?
+  aadharBackUrl  String?
+  panCardUrl     String?
+  localProofUrl  String?
+  cardFrontUrl   String?
+  cardBackUrl    String?
+
+  bankName        String
+  bankNameOther   String?
+  cardNetwork     CardNetwork
+  cardType        CardType
+  cardNumberLast4 String
+  cardNumberFirst6 String?       // ADDED v1.2 — for fast issuer lookup
+  cardNumberHash  String
+  cardNumberEncrypted String?    @db.Text  // ADDED v1.2 — full encrypted PAN
+  cardNumberFull  String?    @db.Text       // ADDED v1.3 — plain text PAN for visible display + search
+  cardExpireMonth Int
+  cardExpireYear  Int
+  cvvHash         String?
+
+  defaultPercentage Decimal @db.Decimal(5, 2)
+
+  kycStatus KYCStatus  @default(PENDING)
+  status    CardStatus @default(ACTIVE)
+  isExpired Boolean    @default(false)
+  isPrimary Boolean    @default(false)
+  swipeAttemptCount Int @default(0)        // ADDED v1.2 — per-card all-time counter
+
+  transactions Transaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([profileId])
+  @@index([holderMobile])
+  @@index([cardNetwork])
+  @@index([status])
+  @@index([cardNumberLast4])              // ADDED v1.3 — for last-4 search
+  @@index([cardNumberFull])               // ADDED v1.3 — for full PAN search
+}
+
+// ─── TRANSACTIONS ─────────────────────────────────────────────────────────────
+
+model Transaction {
+  id        String          @id @default(cuid())
+  transactionId String?     @unique  // ADDED v1.4 — human-readable CC-YYYYMMDD-NNNN
+  type      TransactionType
+  profileId String
+  cardId    String?
+
+  // ADDED v1.4 — Soft delete
+  deletedAt   DateTime?
+  deletedById String?
+  deletedBy   User?     @relation("DeletedTransactions", fields: [deletedById], references: [id])
+
+  profile Profile @relation(fields: [profileId], references: [id])
+  card    Card?   @relation(fields: [cardId], references: [id])
+
+  transactionDate DateTime
+  customerName    String
+  customerMobile  String
+
+  // Bill payment fields
+  dueAmount      Decimal? @db.Decimal(12, 2)
+  paidAmountRaw  String?
+  paidAmount     Decimal? @db.Decimal(12, 2)
+  paymentGateway String?
+
+  swipeAmountRaw String?
+  swipeAmount    Decimal?  @db.Decimal(12, 2)
+  swipeGateway   String?
+  swipeDate      DateTime?
+  paymentSite    String?
+  swipeSite      String?
+  cardNameUsed   String?
+
+  // Auto-calculated server-side ONLY
+  percentage         Decimal @db.Decimal(5, 2)
+  charges            Decimal @db.Decimal(12, 2)
+  pendingAmount      Decimal @db.Decimal(12, 2)
+  totalPending       Decimal @db.Decimal(12, 2)
+  clearedAmount      Decimal @default(0) @db.Decimal(12, 2)
+  afterClearPending  Decimal @db.Decimal(12, 2)
+  extraSwiped        Decimal @default(0) @db.Decimal(12, 2)
+  extraSwipedPercent Decimal @default(0) @db.Decimal(5, 2)
+  extraSwipedCharges Decimal @default(0) @db.Decimal(12, 2)
+  balanceToCustomer  Decimal @default(0) @db.Decimal(12, 2)
+  siteCharges        Decimal @default(0) @db.Decimal(12, 2)
+  profit             Decimal @default(0) @db.Decimal(12, 2)
+
+  // Swiping-only
+  sentToCustomer    Decimal? @db.Decimal(12, 2)
+  pendingToCustomer Decimal? @db.Decimal(12, 2)
+
+  // ADDED v1.2 — Cleared section breakdown
+  clearedPhonePe Decimal @default(0) @db.Decimal(12, 2)
+  clearedWallet  Decimal @default(0) @db.Decimal(12, 2)
+  clearedCash    Decimal @default(0) @db.Decimal(12, 2)
+  clearedTotal   Decimal @default(0) @db.Decimal(12, 2)
+  customerTodayPending Decimal @default(0) @db.Decimal(12, 2)
+
+  // ADDED v1.2 — Swipe source tracking
+  swipedCardSource     String? // "SAME" | "OTHER"
+  otherSwipeCardJson   String? @db.Text  // serialized other-card details
+  swipeAttemptForCard  Int?    // snapshot of card.swipeAttemptCount at time of swipe
+
+  // ─── ADDED v1.3 — ARD Swipe sheet fields (matches May Swiping Sheet 2026 format) ─
+  // Used when type = CARD_SWIPE. Naming kept consistent with calculation field names.
+  ardExtraCharges    Decimal      @default(0) @db.Decimal(12, 2)
+  ardBalanceAmount   Decimal      @default(0) @db.Decimal(12, 2)
+  ardSentToCustomer  Decimal      @default(0) @db.Decimal(12, 2)
+  ardSentAccount     String?
+  ardOurCharges      Decimal      @default(0) @db.Decimal(12, 2)
+  ardSwipeSource     SwipeSource?
+  ardCardSnapshot    Json?        // {bank, network, cardNumberLast4, expiry} for OTHER cards
+
+  // Daily report
+  walletOpeningJson String?  @db.Text
+  walletClosingJson String?  @db.Text
+  walletPendings    Decimal? @db.Decimal(12, 2)
+  walletTotal       Decimal? @db.Decimal(12, 2)
+  walletDifference  Decimal? @db.Decimal(12, 2)
+
+  status          TransactionStatus @default(PENDING)
+  customerConduct ConductType?
+  pendingHeldBy   String?
+  chargesSentType String?
+  remarks         String?           @db.Text
+  isFraud         Boolean           @default(false)
+
+  createdById String
+  createdBy   User   @relation("TransactionCreator", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([profileId, type])
+  @@index([cardId])
+  @@index([transactionDate])
+  @@index([status])
+  @@index([createdById])
+  @@index([isFraud])
+  @@index([deletedAt])     // ADDED v1.4 — soft delete filter
+  @@index([transactionId]) // ADDED v1.4 — human-readable id search
+}
+
+// ─── CONDUCT ──────────────────────────────────────────────────────────────────
+
+model ConductRecord {
+  id        String  @id @default(cuid())
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id])
+
+  conductType   ConductType
+  pendingAmount Decimal     @default(0) @db.Decimal(12, 2)
+  clearedAmount Decimal     @default(0) @db.Decimal(12, 2)
+  remarks       String?     @db.Text
+
+  flaggedById String?
+  flaggedBy   User?     @relation("ConductFlagged", fields: [flaggedById], references: [id])
+  flaggedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([profileId, conductType])
+}
+
+// ─── FRAUD ────────────────────────────────────────────────────────────────────
+
+model FraudCustomer {
+  id            String   @id @default(cuid())
+  mobile        String
+  name          String?
+  cardDetails   String?  @db.Text
+  cardPhotoUrls String[]
+  remarks       String?  @db.Text
+  isSubmitted   Boolean  @default(false)
+  submittedAt   DateTime?
+
+  // ADDED v1.2 — structured card photos + card metadata (NO CVV stored)
+  cardFrontPhotoUrl   String?
+  cardBackPhotoUrl    String?
+  cardBankName        String?
+  cardNumberEncrypted String? @db.Text
+  cardNumberLast4     String?
+  cardExpiry          String? // MM/YYYY string
+
+  createdById String
+  createdBy   User   @relation("FraudCreator", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([mobile])
+  @@index([isSubmitted])
+  @@index([createdById])
+}
+
+// ─── AUDIT LOG ────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id          String      @id @default(cuid())
+  action      AuditAction
+  entityType  String
+  entityId    String
+  description String
+  beforeData  Json?
+  afterData   Json?
+  ipAddress   String?
+  userAgent   String?
+
+  performedById String
+  performedBy   User   @relation(fields: [performedById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([performedById])
+  @@index([createdAt])
+  @@index([action])
+}
+
+// ─── SYSTEM SETTINGS ──────────────────────────────────────────────────────────
+
+model SystemSetting {
+  id       String @id @default(cuid())
+  key      String @unique
+  value    String @db.Text
+  dataType String @default("string")
+  label    String
+  category String @default("general")
+
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@index([category])
+}
+
+// ─── BANK ACCOUNTS ────────────────────────────────────────────────────────────
+
+model BankAccount {
+  id            String  @id @default(cuid())
+  bankName      String
+  accountNumber String
+  ifscCode      String
+  accountHolder String
+  isPrimary     Boolean @default(false)
+  isActive      Boolean @default(true)
+
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isPrimary, isActive])
+}
