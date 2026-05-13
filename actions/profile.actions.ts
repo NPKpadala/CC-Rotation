@@ -146,7 +146,7 @@ export async function createProfile(formData: FormData): Promise<ServerActionRes
           entityType: "Profile",
           entityId: profile.id,
           description: `Created profile for ${profile.name} (${profile.mobile})`,
-          afterData: profile as unknown as Record<string, unknown>,
+          afterData: profile as unknown,
           performedById: session.user.id,
         },
       });
@@ -192,8 +192,8 @@ export async function updateProfile(formData: FormData): Promise<ServerActionRes
           entityType: "Profile",
           entityId: p.id,
           description: `Updated profile ${p.name}`,
-          beforeData: before as unknown as Record<string, unknown>,
-          afterData: p as unknown as Record<string, unknown>,
+          beforeData: before as unknown,
+          afterData: p as unknown,
           performedById: session.user.id,
         },
       });
@@ -228,7 +228,7 @@ export async function deleteProfile(id: string): Promise<ServerActionResult> {
           entityType: "Profile",
           entityId: id,
           description: `Deleted profile ${before.name} (${before.mobile})`,
-          beforeData: before as unknown as Record<string, unknown>,
+          beforeData: before as unknown,
           performedById: session.user.id,
         },
       });
@@ -281,8 +281,8 @@ export async function updateOldPendings(
           entityType: "Profile",
           entityId: profileId,
           description: `Updated old pendings for ${before.name}: old=${oldPendings}, cleared=${clearedOldPendings}`,
-          beforeData: { oldPendings: before.oldPendings, clearedOldPendings: before.clearedOldPendings } as Record<string, unknown>,
-          afterData: { oldPendings, clearedOldPendings } as Record<string, unknown>,
+          beforeData: { oldPendings: before.oldPendings, clearedOldPendings: before.clearedOldPendings },
+          afterData: { oldPendings, clearedOldPendings },
           performedById: session.user.id,
         },
       });
@@ -399,7 +399,7 @@ export async function updateProfileById(
     // Compute changed-keys for the audit-log description
     const changedKeys: string[] = [];
     for (const [k, v] of Object.entries(candidateFields)) {
-      const beforeVal = (before as unknown as Record<string, unknown>)[k];
+      const beforeVal = (before as unknown)[k];
       // Date comparison
       if (beforeVal instanceof Date) {
         const beforeIso = beforeVal.toISOString().slice(0, 10);
@@ -427,7 +427,7 @@ export async function updateProfileById(
             changedKeys.length > 0
               ? `Edited profile for ${data.name} — changed: ${changedKeys.slice(0, 8).join(", ")}${changedKeys.length > 8 ? `, +${changedKeys.length - 8} more` : ""}`
               : `Saved profile for ${data.name} (no field changes)`,
-          beforeData: before as unknown as Record<string, unknown>,
+          beforeData: before as unknown,
           afterData: candidateFields,
           performedById: session.user.id,
         },

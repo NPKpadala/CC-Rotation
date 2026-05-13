@@ -55,7 +55,7 @@ export async function createUser(formData: FormData): Promise<ServerActionResult
           entityType: "User",
           entityId: u.id,
           description: `Created ${parsed.data.role} user ${parsed.data.name} (${parsed.data.mobile})`,
-          afterData: { ...u, passwordHash: "[REDACTED]" } as Record<string, unknown>,
+          afterData: { ...u, passwordHash: "[REDACTED]" },
           performedById: session.user.id,
         },
       });
@@ -92,8 +92,8 @@ export async function updateUserStatus(
           entityType: "User",
           entityId: userId,
           description: `Set ${u.name} status → ${status}`,
-          beforeData: { status: before.status } as Record<string, unknown>,
-          afterData: { status: u.status } as Record<string, unknown>,
+          beforeData: { status: before.status },
+          afterData: { status: u.status },
           performedById: session.user.id,
         },
       });
@@ -129,8 +129,8 @@ export async function updateUserRole(
           entityType: "User",
           entityId: userId,
           description: `Set ${u.name} role → ${role}`,
-          beforeData: { role: before.role } as Record<string, unknown>,
-          afterData: { role: u.role } as Record<string, unknown>,
+          beforeData: { role: before.role },
+          afterData: { role: u.role },
           performedById: session.user.id,
         },
       });

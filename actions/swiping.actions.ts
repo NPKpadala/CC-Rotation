@@ -140,7 +140,7 @@ export async function createSwipe(formData: FormData): Promise<ServerActionResul
           entityType: "Transaction",
           entityId: t.id,
           description: `Swipe ₹${parsedData.swipeAmount} for ${parsedData.customerName} (${swipedCardSource}${attemptSnapshot ? ` · attempt ${attemptSnapshot}` : ""})`,
-          afterData: t as unknown as Record<string, unknown>,
+          afterData: t as unknown,
           performedById: session.user.id,
         },
       });
@@ -298,7 +298,7 @@ export async function createArdSwipe(
           entityType: "Transaction",
           entityId: t.id,
           description: `ARD Swipe ₹${Number(data.swipeAmount).toFixed(2)} for ${data.customerName} (${data.swipeSource}${attemptSnapshot ? ` · attempt #${attemptSnapshot}` : ""})`,
-          afterData: t as unknown as Record<string, unknown>,
+          afterData: t as unknown,
           performedById: session.user.id,
         },
       });

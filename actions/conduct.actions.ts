@@ -33,7 +33,7 @@ export async function flagConduct(
           entityType: "ConductRecord",
           entityId: c.id,
           description: `Flagged profile ${profileId} as ${conductType}`,
-          afterData: c as unknown as Record<string, unknown>,
+          afterData: c as unknown,
           performedById: session.user.id,
         },
       });

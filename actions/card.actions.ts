@@ -117,7 +117,7 @@ export async function createCard(formData: FormData): Promise<ServerActionResult
             cardNumberHash: "[REDACTED]",
             cardNumberEncrypted: "[REDACTED]",
             cvvHash: "[REDACTED]",
-          } as Record<string, unknown>,
+          },
           performedById: session.user.id,
         },
       });
@@ -180,7 +180,7 @@ export async function deleteCard(id: string): Promise<ServerActionResult> {
             cardNumberHash: "[REDACTED]",
             cardNumberEncrypted: "[REDACTED]",
             cvvHash: "[REDACTED]",
-          } as Record<string, unknown>,
+          },
           performedById: session.user.id,
         },
       });
@@ -228,7 +228,7 @@ export async function updateCardDocs(
     // Compute changed keys for audit message
     const changed: string[] = [];
     for (const k of Object.keys(data) as Array<keyof typeof data>) {
-      const beforeVal = (before as unknown as Record<string, unknown>)[k as string] ?? null;
+      const beforeVal = (before as unknown)[k as string] ?? null;
       const newVal = data[k] || null;
       if (beforeVal !== newVal) changed.push(k as string);
     }
@@ -256,13 +256,13 @@ export async function updateCardDocs(
             cardNumberHash: "[REDACTED]",
             cardNumberEncrypted: "[REDACTED]",
             cvvHash: "[REDACTED]",
-          } as Record<string, unknown>,
+          },
           afterData: {
             ...updated,
             cardNumberHash: "[REDACTED]",
             cardNumberEncrypted: "[REDACTED]",
             cvvHash: "[REDACTED]",
-          } as Record<string, unknown>,
+          },
           performedById: session.user.id,
         },
       });

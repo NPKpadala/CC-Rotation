@@ -84,7 +84,7 @@ export async function createDailyReport(formData: FormData): Promise<ServerActio
           entityType: "Transaction",
           entityId: t.id,
           description: `Daily report for ${new Date(data.transactionDate).toDateString()}`,
-          afterData: t as unknown as Record<string, unknown>,
+          afterData: t as unknown,
           performedById: session.user.id,
         },
       });

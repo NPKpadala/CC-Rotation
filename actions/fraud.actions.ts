@@ -68,7 +68,7 @@ export async function createFraud(formData: FormData): Promise<ServerActionResul
           entityType: "FraudCustomer",
           entityId: created.id,
           description: `Reported fraud for ${parsed.data.mobile}${cardNumberLast4 ? ` (card ••${cardNumberLast4})` : ""}`,
-          afterData: { ...created, cardNumberEncrypted: "[REDACTED]" } as Record<string, unknown>,
+          afterData: { ...created, cardNumberEncrypted: "[REDACTED]" },
           performedById: session.user.id,
         },
       });
@@ -126,8 +126,8 @@ export async function updateFraud(id: string, formData: FormData): Promise<Serve
           entityType: "FraudCustomer",
           entityId: id,
           description: `Updated fraud entry for ${before.mobile}`,
-          beforeData: { ...before, cardNumberEncrypted: "[REDACTED]" } as Record<string, unknown>,
-          afterData: { ...updated, cardNumberEncrypted: "[REDACTED]" } as Record<string, unknown>,
+          beforeData: { ...before, cardNumberEncrypted: "[REDACTED]" },
+          afterData: { ...updated, cardNumberEncrypted: "[REDACTED]" },
           performedById: session.user.id,
         },
       });
@@ -161,8 +161,8 @@ export async function submitFraud(id: string): Promise<ServerActionResult> {
           entityType: "FraudCustomer",
           entityId: id,
           description: `Submitted (locked) fraud entry for ${before.mobile}`,
-          beforeData: { ...before, cardNumberEncrypted: "[REDACTED]" } as Record<string, unknown>,
-          afterData: { ...submitted, cardNumberEncrypted: "[REDACTED]" } as Record<string, unknown>,
+          beforeData: { ...before, cardNumberEncrypted: "[REDACTED]" },
+          afterData: { ...submitted, cardNumberEncrypted: "[REDACTED]" },
           performedById: session.user.id,
         },
       });
@@ -192,7 +192,7 @@ export async function deleteFraud(id: string): Promise<ServerActionResult> {
           entityType: "FraudCustomer",
           entityId: id,
           description: `Deleted fraud entry for ${before.mobile}`,
-          beforeData: { ...before, cardNumberEncrypted: "[REDACTED]" } as Record<string, unknown>,
+          beforeData: { ...before, cardNumberEncrypted: "[REDACTED]" },
           performedById: session.user.id,
         },
       });

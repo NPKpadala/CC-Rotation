@@ -195,7 +195,7 @@ export async function createBillPayment(formData: FormData): Promise<ServerActio
           entityType: "Transaction",
           entityId: t.id,
           description: `Bill payment ₹${calc.paidAmount} for ${data.customerName} — ${isPending ? "PENDING" : "CLEARED"}`,
-          afterData: t as unknown as Record<string, unknown>,
+          afterData: t as unknown,
           performedById: session.user.id,
         },
       });
@@ -348,8 +348,8 @@ export async function updateBillPayment(
           entityType: "Transaction",
           entityId: id,
           description: `Edited bill payment for ${data.customerName} (was ${before.status} → ${isPending ? "PENDING" : "CLEARED"})`,
-          beforeData: before as unknown as Record<string, unknown>,
-          afterData: t as unknown as Record<string, unknown>,
+          beforeData: before as unknown,
+          afterData: t as unknown,
           performedById: session.user.id,
         },
       });
@@ -396,8 +396,8 @@ export async function clearPendingBalance(transactionId: string, additionalClear
           entityType: "Transaction",
           entityId: t.id,
           description: `Cleared ₹${additionalCleared} for ${before.customerName}`,
-          beforeData: before as unknown as Record<string, unknown>,
-          afterData: t as unknown as Record<string, unknown>,
+          beforeData: before as unknown,
+          afterData: t as unknown,
           performedById: session.user.id,
         },
       });
@@ -433,7 +433,7 @@ export async function deleteBillPayment(id: string): Promise<ServerActionResult>
           entityType: "Transaction",
           entityId: id,
           description: `Soft-deleted bill payment ${before.transactionId ?? id} for ${before.customerName}`,
-          beforeData: before as unknown as Record<string, unknown>,
+          beforeData: before as unknown,
           performedById: session.user.id,
         },
       });
@@ -469,7 +469,7 @@ export async function restoreTransaction(id: string): Promise<ServerActionResult
           entityType: "Transaction",
           entityId: id,
           description: `Restored ${before.transactionId ?? id} from trash`,
-          beforeData: before as unknown as Record<string, unknown>,
+          beforeData: before as unknown,
           performedById: session.user.id,
         },
       });
@@ -511,7 +511,7 @@ export async function permanentDeleteTransaction(
           entityType: "Transaction",
           entityId: id,
           description: `Permanently deleted ${before.transactionId ?? id}`,
-          beforeData: before as unknown as Record<string, unknown>,
+          beforeData: before as unknown,
           performedById: session.user.id,
         },
       });
